@@ -106,61 +106,30 @@ const BimViewerUI = {
     return `
       <div class="modern-group">
         <div class="modern-label">🌍 Cesium Ion Assets</div>
-        <button id="loadIonAssets" class="modern-btn modern-btn-primary" title="Load assets from your Cesium Ion account">
-          <span class="modern-btn-icon">🌍</span>
-          <span>Load Ion Assets</span>
-        </button>
-        
-        <select id="ionAssetSelector" class="modern-select">
-          <option value="">-- Select an asset --</option>
+        <div id="ionAssetsLoading" class="modern-hint" style="text-align: center; padding: 12px;">
+          <span>⏳ Loading assets...</span>
+        </div>
+
+        <select id="ionAssetSelector" class="modern-select" style="display: none;">
+          <option value="">-- Select an asset to import --</option>
         </select>
-        
-        <button id="importSelectedAsset" class="modern-btn modern-btn-primary" disabled>
+
+        <button id="importSelectedAsset" class="modern-btn modern-btn-primary" style="display: none;">
           <span class="modern-btn-icon">➕</span>
           <span>Import Selected</span>
         </button>
+
+        <!-- Hidden button for manual reload if needed -->
+        <button id="loadIonAssets" style="display: none;"></button>
       </div>
-      
+
       <div class="modern-divider">
-        <span class="modern-divider-text">or import by ID</span>
+        <span class="modern-divider-text">Loaded Assets</span>
       </div>
-      
-      <div class="modern-group">
-        <input type="text" id="assetNameInput" placeholder="Asset Name (optional)" class="modern-input">
-        <input type="number" id="assetIdInput" placeholder="Ion Asset ID" class="modern-input">
-        <button id="importAssetById" class="modern-btn modern-btn-primary">
-          <span class="modern-btn-icon">➕</span>
-          <span>Import by ID</span>
-        </button>
+
+      <div id="loadedAssetsList" class="modern-assets-list">
+        <div class="modern-empty-state">No assets loaded yet</div>
       </div>
-      
-      <div class="modern-divider">
-        <span class="modern-divider-text">🏗️ iTwin Models</span>
-      </div>
-      
-      <div class="modern-group">
-        <div class="modern-hint" style="margin-bottom: 8px;">
-          <strong>📝 Both fields required:</strong><br>
-          Share Key for the iTwin Project<br>
-          iModel ID for the specific Model
-        </div>
-        
-        <input type="text" id="iTwinShareKeyInput" placeholder="iTwin Share Key (eyJhbGci...)" class="modern-input" style="font-family: monospace; font-size: 11px;">
-        <input type="text" id="iTwinModelIdInput" placeholder="iModel ID (d57113ce-...)" class="modern-input" style="font-family: monospace; font-size: 11px;">
-        <input type="text" id="iTwinModelNameInput" placeholder="Model Name (optional)" class="modern-input">
-        <button id="importITwinModel" class="modern-btn modern-btn-itwin">
-          <span class="modern-btn-icon">🏗️</span>
-          <span>Import iTwin Model</span>
-        </button>
-      </div>
-      
-      <div class="modern-hint" style="margin-top: 8px;">
-        <strong>💡 How to get:</strong><br>
-        <strong>Share Key:</strong> iTwin Platform API<br>
-        <strong>iModel ID:</strong> From iTwin project
-      </div>
-      
-      <div id="loadedAssetsList" class="modern-assets-list"></div>
     `;
   },
 
@@ -599,44 +568,7 @@ const BimViewerUI = {
 
   // ✅ COMPLETE: Initialize all event handlers
   initEventHandlers() {
-    // ✅ iTwin Model Import
-    document.getElementById('importITwinModel')?.addEventListener('click', () => {
-      const shareKey = document.getElementById('iTwinShareKeyInput').value.trim();
-      const iModelId = document.getElementById('iTwinModelIdInput').value.trim();
-      const modelName = document.getElementById('iTwinModelNameInput').value.trim() || null;
-      
-      if (!shareKey) {
-        BimViewer.updateStatus('❌ Please enter Share Key', 'error');
-        return;
-      }
-      
-      if (!iModelId) {
-        BimViewer.updateStatus('❌ Please enter iModel ID', 'error');
-        return;
-      }
-      
-      BimViewer.loadITwinModel(shareKey, iModelId, modelName);
-      
-      // Clear inputs after successful submission
-      document.getElementById('iTwinShareKeyInput').value = '';
-      document.getElementById('iTwinModelIdInput').value = '';
-      document.getElementById('iTwinModelNameInput').value = '';
-    });
-
-    // Enter key support for iTwin inputs
-    document.getElementById('iTwinModelIdInput')?.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        document.getElementById('importITwinModel').click();
-      }
-    });
-
-    document.getElementById('iTwinShareKeyInput')?.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        document.getElementById('iTwinModelIdInput').focus();
-      }
-    });
-
-    // ✅ Ion Assets Loading
+    // Ion Assets Loading (manual reload - hidden by default)
     document.getElementById('loadIonAssets')?.addEventListener('click', async () => {
       const btn = document.getElementById('loadIonAssets');
       const selector = document.getElementById('ionAssetSelector');
@@ -686,12 +618,6 @@ const BimViewerUI = {
       const selector = document.getElementById('ionAssetSelector');
       const assetId = selector.value;
       const assetName = selector.options[selector.selectedIndex].text;
-      if (assetId) BimViewer.loadSelectedAsset(assetId, assetName);
-    });
-
-    document.getElementById('importAssetById')?.addEventListener('click', () => {
-      const assetId = document.getElementById('assetIdInput').value;
-      const assetName = document.getElementById('assetNameInput').value || `Asset ${assetId}`;
       if (assetId) BimViewer.loadSelectedAsset(assetId, assetName);
     });
 
@@ -1137,6 +1063,51 @@ const BimViewerUI = {
     // Preset buttons are explicit user actions, so log them (isLiveUpdate=false)
     if (typeof BimViewer.applyIndividualZOffset === 'function') {
       BimViewer.applyIndividualZOffset(assetId, value, false);
+    }
+  },
+
+  // Auto-load Ion assets on startup
+  async autoLoadIonAssets() {
+    const loadingEl = document.getElementById('ionAssetsLoading');
+    const selector = document.getElementById('ionAssetSelector');
+    const importBtn = document.getElementById('importSelectedAsset');
+
+    if (!selector) {
+      console.log('Ion asset selector not found, retrying...');
+      setTimeout(() => this.autoLoadIonAssets(), 500);
+      return;
+    }
+
+    try {
+      console.log('Auto-loading Ion assets...');
+
+      // Fetch assets from Ion account
+      const assets = await BimViewer.fetchAvailableAssets();
+
+      // Hide loading, show selector
+      if (loadingEl) loadingEl.style.display = 'none';
+      selector.style.display = 'block';
+      if (importBtn) importBtn.style.display = 'block';
+
+      // Clear and populate selector
+      selector.innerHTML = '<option value="">-- Select an asset to import --</option>';
+
+      assets.forEach(asset => {
+        const option = document.createElement('option');
+        option.value = asset.id;
+        option.textContent = `${asset.name} (ID: ${asset.id})`;
+        selector.appendChild(option);
+      });
+
+      console.log(`Loaded ${assets.length} Ion assets`);
+      BimViewer.updateStatus(`${assets.length} assets available`, 'success');
+
+    } catch (error) {
+      console.error('Failed to auto-load Ion assets:', error);
+      if (loadingEl) {
+        loadingEl.innerHTML = '<span style="color: #f44336;">Failed to load assets. Check console.</span>';
+      }
+      BimViewer.updateStatus('Failed to load Ion assets', 'error');
     }
   }
 };

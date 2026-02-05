@@ -289,6 +289,12 @@
               console.log('Lighting system initialized');
             }
 
+            // Auto-load Ion assets
+            if (typeof BimViewerUI !== 'undefined' && typeof BimViewerUI.autoLoadIonAssets === 'function') {
+              BimViewerUI.autoLoadIonAssets();
+              console.log('Auto-loading Ion assets...');
+            }
+
             // Wait for first asset before initializing other systems
             waitForAssetAndInitSystems();
 
