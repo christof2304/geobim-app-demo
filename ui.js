@@ -1078,11 +1078,35 @@ const BimViewerUI = {
       return;
     }
 
+    // Filter out base layer assets (Google 3D Tiles, Bing, OSM, Google Maps)
+    const excludedPatterns = [
+      /google.*3d.*tiles/i,
+      /google.*photorealistic/i,
+      /google.*maps/i,
+      /bing.*maps/i,
+      /bing.*aerial/i,
+      /bing.*imagery/i,
+      /osm.*buildings/i,
+      /openstreetmap.*buildings/i,
+      /cesium.*osm/i,
+      /cesium.*world.*terrain/i,
+      /sentinel/i,
+      /blue.*marble/i
+    ];
+
+    const isExcluded = (assetName) => {
+      const name = assetName.toLowerCase();
+      return excludedPatterns.some(pattern => pattern.test(name));
+    };
+
     try {
       console.log('Auto-loading Ion assets...');
 
       // Fetch assets from Ion account
-      const assets = await BimViewer.fetchAvailableAssets();
+      const allAssets = await BimViewer.fetchAvailableAssets();
+
+      // Filter out base layer assets
+      const assets = allAssets.filter(asset => !isExcluded(asset.name));
 
       // Hide loading, show selector
       if (loadingEl) loadingEl.style.display = 'none';
@@ -1099,7 +1123,7 @@ const BimViewerUI = {
         selector.appendChild(option);
       });
 
-      console.log(`Loaded ${assets.length} Ion assets`);
+      console.log(`Loaded ${assets.length} Ion assets (filtered from ${allAssets.length})`);
       BimViewer.updateStatus(`${assets.length} assets available`, 'success');
 
     } catch (error) {
