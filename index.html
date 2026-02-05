@@ -50,41 +50,7 @@
     </div>
   </div>
 
-  <!-- ============================================
-       LOGIN SCREEN (Shows after splash)
-       ============================================ -->
-  <div id="loginScreen" style="display: none;">
-    <div class="login-container">
-      <div class="login-header">
-        <span class="login-icon">🏗️</span>
-        <h1>geobim.app</h1>
-        <p>Please sign in</p>
-      </div>
-
-      <form id="loginForm" class="login-form">
-        <div class="login-field">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" placeholder="your@email.com" required autocomplete="email">
-        </div>
-
-        <div class="login-field">
-          <label for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
-        </div>
-
-        <div id="loginError"></div>
-
-        <button type="submit" id="loginBtn" class="login-btn">
-          <span id="loginSpinner"></span>
-          <span id="loginBtnText">Sign In</span>
-        </button>
-      </form>
-
-      <div class="login-footer">
-        <small>Access for authorized users only</small>
-      </div>
-    </div>
-  </div>
+  <!-- Login screen removed - Demo mode active -->
 
   <!-- ============================================
        MAIN APP (Hidden until logged in)
@@ -246,27 +212,28 @@
     let viewerInitialized = false;
     let splashDismissed = false;
 
-    // Splash screen handler
+    // Splash screen handler - go directly to app (no login required)
     document.getElementById('enterDemoBtn').addEventListener('click', function() {
       document.getElementById('splashScreen').classList.add('hidden');
       splashDismissed = true;
-      // Show login screen after splash is dismissed
-      document.getElementById('loginScreen').style.display = 'flex';
+      // Initialize auth (demo mode - no login)
+      if (typeof BimAuth !== 'undefined') {
+        BimAuth.init();
+      }
     });
 
     window.addEventListener('load', function() {
       console.log('Page loaded, waiting for splash dismissal and authentication...');
 
-      // Wait for auth and then initialize
+      // Wait for splash dismissal and then initialize
       const initSystems = setInterval(function() {
         // First check if splash was dismissed
         if (!splashDismissed) {
           return;
         }
 
-        // Then check if user is logged in
-        if (!BimAuth || !BimAuth.isLoggedIn()) {
-          console.log('Waiting for login...');
+        // Check if auth is initialized (demo mode)
+        if (!BimAuth || !BimAuth.initialized) {
           return;
         }
 
