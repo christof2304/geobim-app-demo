@@ -45,7 +45,6 @@ const BimViewerUI = {
     toolbar.appendChild(this.createHeader());
     
     // Collapsible sections
-    // NOTE: Lighting section is provided by ui-lighting-standalone.js
     toolbar.appendChild(this.createSection('assets', '📦', 'Assets', this.getAssetsContent()));
     toolbar.appendChild(this.createSection('pointcloud', '☁️', 'Point Cloud Settings', this.getPointCloudContent()));
     toolbar.appendChild(this.createSection('drawing', '✏️', 'Drawing & Clipping', this.getDrawingContent()));
@@ -54,6 +53,7 @@ const BimViewerUI = {
     toolbar.appendChild(this.createSection('ifc', '🏗️', 'IFC Filter', this.getIFCContent()));
     toolbar.appendChild(this.createSection('revit', '🏢', 'Revit Filter', this.getRevitContent()));
     toolbar.appendChild(this.createSection('views', '📷', 'Saved Views', this.getViewsContent()));
+    toolbar.appendChild(this.createSection('lighting', '☀️', 'Lighting', this.getLightingContent()));
     toolbar.appendChild(this.createSection('settings', '⚙️', 'Settings', this.getSettingsContent()));
   },
 
@@ -417,6 +417,81 @@ const BimViewerUI = {
     `;
   },
 
+  // Lighting content
+  getLightingContent() {
+    return `
+      <div class="modern-group">
+        <button id="toggleLightingBtn" class="modern-toggle-btn" title="Enable dynamic time-of-day lighting">
+          <span class="modern-btn-icon">🌅</span>
+          <span>Enable Lighting</span>
+        </button>
+      </div>
+
+      <div id="lightingControlsContainer" style="display: none;">
+        <div class="modern-group">
+          <div class="modern-label">Ambient Mode</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <button class="modern-btn modern-btn-small ambient-mode-btn active" data-mode="realistic" title="Dark at night">
+              <span>🌙</span> Realistic
+            </button>
+            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="soft" title="Slightly lit at night">
+              <span>🌆</span> Soft
+            </button>
+            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="balanced" title="Well lit at night">
+              <span>🌃</span> Balanced
+            </button>
+            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="bright" title="Always bright">
+              <span>💡</span> Bright
+            </button>
+          </div>
+        </div>
+
+        <div class="modern-group">
+          <div class="modern-label">Time of Day</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px;">
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="dawn" title="06:00">🌄</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="morning" title="09:00">🌞</button>
+            <button class="modern-btn modern-btn-small time-preset-btn active" data-time="noon" title="12:00">☀️</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="afternoon" title="15:00">🌤️</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="sunset" title="18:00">🌇</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="dusk" title="20:00">🌆</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="night" title="22:00">🌙</button>
+            <button class="modern-btn modern-btn-small time-preset-btn" data-time="midnight" title="00:00">🌃</button>
+          </div>
+        </div>
+
+        <div class="modern-group">
+          <div class="modern-label">Animation</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <button id="playLightingAnim" class="modern-btn modern-btn-small">
+              <span>▶️</span> Play
+            </button>
+            <button id="stopLightingAnim" class="modern-btn modern-btn-small">
+              <span>⏹️</span> Stop
+            </button>
+          </div>
+          <div class="modern-slider-group" style="margin-top: 8px;">
+            <label class="modern-label-small">Speed</label>
+            <input type="range" id="lightingSpeedSlider" min="1" max="100" value="10" class="modern-slider-small">
+            <span id="lightingSpeedValue" class="modern-value-small">10x</span>
+          </div>
+        </div>
+
+        <div class="modern-group">
+          <div class="modern-label">Shadows</div>
+          <button id="toggleShadowsBtn" class="modern-toggle-btn">
+            <span class="modern-btn-icon">🌑</span>
+            <span>Enable Shadows</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modern-hint">
+        <strong>💡 Tip:</strong> Enable lighting to see realistic sun position and shadows based on time of day.
+      </div>
+    `;
+  },
+
   // Settings content
   getSettingsContent() {
     return `
@@ -698,6 +773,87 @@ const BimViewerUI = {
     // Views
     document.getElementById('saveCurrentView')?.addEventListener('click', () => {
       BimViewer.saveView();
+    });
+
+    // Lighting
+    document.getElementById('toggleLightingBtn')?.addEventListener('click', function() {
+      if (typeof BimViewer.enableDynamicLighting !== 'function') {
+        BimViewer.updateStatus('Lighting module not loaded', 'error');
+        return;
+      }
+
+      const isEnabled = BimViewer.lighting?.enabled;
+      if (isEnabled) {
+        BimViewer.disableDynamicLighting();
+        this.classList.remove('active');
+        this.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Enable Lighting</span>';
+        document.getElementById('lightingControlsContainer').style.display = 'none';
+      } else {
+        BimViewer.enableDynamicLighting();
+        this.classList.add('active');
+        this.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Lighting ON</span>';
+        document.getElementById('lightingControlsContainer').style.display = 'block';
+      }
+    });
+
+    // Ambient mode buttons
+    document.querySelectorAll('.ambient-mode-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.ambient-mode-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const mode = this.dataset.mode;
+        if (typeof BimViewer.setAmbientMode === 'function') {
+          BimViewer.setAmbientMode(mode);
+        }
+      });
+    });
+
+    // Time preset buttons
+    document.querySelectorAll('.time-preset-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const time = this.dataset.time;
+        if (typeof BimViewer.setTimePreset === 'function') {
+          BimViewer.setTimePreset(time);
+        }
+      });
+    });
+
+    // Animation controls
+    document.getElementById('playLightingAnim')?.addEventListener('click', () => {
+      if (typeof BimViewer.startTimeAnimation === 'function') {
+        BimViewer.startTimeAnimation();
+        BimViewer.updateStatus('Time animation started', 'success');
+      }
+    });
+
+    document.getElementById('stopLightingAnim')?.addEventListener('click', () => {
+      if (typeof BimViewer.stopTimeAnimation === 'function') {
+        BimViewer.stopTimeAnimation();
+        BimViewer.updateStatus('Time animation stopped', 'success');
+      }
+    });
+
+    document.getElementById('lightingSpeedSlider')?.addEventListener('input', function() {
+      const speed = parseInt(this.value);
+      document.getElementById('lightingSpeedValue').textContent = speed + 'x';
+      if (typeof BimViewer.setAnimationSpeed === 'function') {
+        BimViewer.setAnimationSpeed(speed);
+      }
+    });
+
+    // Shadows toggle
+    document.getElementById('toggleShadowsBtn')?.addEventListener('click', function() {
+      if (!BimViewer.viewer) return;
+      const shadowMap = BimViewer.viewer.scene.shadowMap;
+      shadowMap.enabled = !shadowMap.enabled;
+      this.classList.toggle('active');
+      if (shadowMap.enabled) {
+        this.innerHTML = '<span class="modern-btn-icon">🌑</span><span>Shadows ON</span>';
+      } else {
+        this.innerHTML = '<span class="modern-btn-icon">🌑</span><span>Enable Shadows</span>';
+      }
     });
 
     // Settings
