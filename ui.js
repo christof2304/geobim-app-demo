@@ -470,7 +470,23 @@ const BimViewerUI = {
 
   // Settings content
   getSettingsContent() {
+    const ionTokenSection = isProFeature('customIonToken') ? `
+      <div class="modern-group">
+        <div class="modern-label">🔑 Cesium Ion Token</div>
+        <input type="text" id="customIonTokenInput" class="modern-input"
+               placeholder="Enter your Ion Token"
+               value="${BimAuth.getIonToken() || ''}"
+               style="width: 100%; padding: 8px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: white; box-sizing: border-box; font-size: 12px; margin-bottom: 8px;">
+        <button class="modern-btn modern-btn-primary" onclick="BimAuth.setCustomIonToken(document.getElementById('customIonTokenInput').value)">
+          <span class="modern-btn-icon">🔑</span>
+          <span>Apply Token</span>
+        </button>
+        <div class="modern-hint">Use your own Cesium Ion account</div>
+      </div>
+    ` : '';
+
     return `
+      ${ionTokenSection}
       <div class="modern-group">
         <div class="modern-label">Performance Preset</div>
         <select id="performancePreset" class="modern-select">

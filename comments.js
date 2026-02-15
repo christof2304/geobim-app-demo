@@ -8,17 +8,16 @@
  */
 
 // ===============================
-// CESIUM BIM VIEWER - COMMENTS MODULE (v5.0 - LOCAL STORAGE)
+// CESIUM BIM VIEWER - COMMENTS MODULE (v6.0 - DUAL STORAGE)
 // 3D Comment/Annotation System with Point & Area Support
 // NO LEFT-CLICK CONFLICT!
-// VERSION: 5.0 - DEMO MODE: Uses localStorage instead of Firebase
+// VERSION: 6.0 - Supports localStorage (Demo) and Firestore (Pro)
 // ===============================
 'use strict';
 
 (function() {
 
-  console.log('💬 Loading Comments module v5.0 (LOCAL STORAGE - Demo Mode)...');
-  console.log('✅ Comments stored in browser localStorage');
+  console.log('💬 Loading Comments module v6.0...');
 
   // =====================================
   // UTILITY FUNCTIONS
@@ -38,6 +37,7 @@
   BimViewer.comments = {
     db: null,
     initialized: false,
+    storageMode: 'localStorage', // 'localStorage' or 'firestore'
     isAddingComment: false,
     annotationType: 'point', // 'point' or 'area'
     editingComment: null,
@@ -111,7 +111,7 @@
   const STORAGE_KEY = 'bim_viewer_comments';
 
   // =====================================
-  // LOCAL STORAGE INITIALIZATION (v5.0 DEMO)
+  // COMMENTS INITIALIZATION (DUAL MODE)
   // =====================================
 
   BimViewer.initFirebase = function() {
@@ -128,12 +128,20 @@
     }
 
     try {
-      console.log('✅ Using localStorage for comments (Demo Mode)');
-
-      this.comments.initialized = true;
-
-      // Load existing comments from localStorage
-      this.loadCommentsFromStorage();
+      if (isProFeature('firebaseComments') && typeof firebase !== 'undefined' && firebase.firestore) {
+        // Pro: Firestore
+        this.comments.db = firebase.firestore();
+        this.comments.initialized = true;
+        this.comments.storageMode = 'firestore';
+        this.loadCommentsFromFirestore();
+        console.log('✅ Using Firestore for comments (Pro Mode)');
+      } else {
+        // Demo: localStorage
+        this.comments.initialized = true;
+        this.comments.storageMode = 'localStorage';
+        this.loadCommentsFromStorage();
+        console.log('✅ Using localStorage for comments (Demo Mode)');
+      }
 
       // Initialize click handler if not already done
       if (!this.comments.clickHandlerInitialized) {
@@ -204,7 +212,82 @@
   };
 
   // =====================================
-  // COMMENT CRUD OPERATIONS (localStorage)
+  // FIRESTORE OPERATIONS (Pro only)
+  // =====================================
+
+  const FIRESTORE_COLLECTION = 'bim_viewer_comments';
+
+  BimViewer.loadCommentsFromFirestore = function() {
+    if (!this.comments.db) return;
+
+    var self = this;
+
+    this.comments.db.collection(FIRESTORE_COLLECTION)
+      .orderBy('timestamp', 'desc')
+      .onSnapshot(function(snapshot) {
+        if (self.viewer) {
+          self.viewer.entities.suspendEvents();
+        }
+
+        // Remove old entities
+        self.comments.comments.forEach(function(comment) {
+          if (self.viewer) self.viewer.entities.removeById(comment.id);
+        });
+        self.comments.comments = [];
+
+        snapshot.forEach(function(doc) {
+          var comment = doc.data();
+          comment.id = doc.id;
+          self.comments.comments.push(comment);
+
+          if (self.viewer && !self.viewer.entities.getById(comment.id)) {
+            if (comment.type === 'area') {
+              self.addAreaEntity(comment);
+            } else {
+              self.addCommentEntity(comment);
+            }
+          }
+        });
+
+        if (self.viewer) {
+          self.viewer.entities.resumeEvents();
+        }
+
+        self.updateCommentsList();
+        self.updateCommentsCount();
+
+        console.log('📂 Loaded ' + self.comments.comments.length + ' comment(s) from Firestore');
+      }, function(error) {
+        console.error('❌ Firestore listener error:', error);
+      });
+  };
+
+  BimViewer.saveCommentToFirestore = function(commentData) {
+    if (!this.comments.db) return Promise.reject(new Error('Firestore not initialized'));
+
+    var docData = {};
+    var keys = Object.keys(commentData);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] !== 'id') {
+        docData[keys[i]] = commentData[keys[i]];
+      }
+    }
+
+    return this.comments.db.collection(FIRESTORE_COLLECTION)
+      .doc(commentData.id)
+      .set(docData);
+  };
+
+  BimViewer.deleteCommentFromFirestore = function(commentId) {
+    if (!this.comments.db) return Promise.reject(new Error('Firestore not initialized'));
+
+    return this.comments.db.collection(FIRESTORE_COLLECTION)
+      .doc(commentId)
+      .delete();
+  };
+
+  // =====================================
+  // COMMENT CRUD OPERATIONS (dual mode)
   // =====================================
 
   BimViewer.saveComment = async function(commentData) {
@@ -248,8 +331,12 @@
         }
       }
 
-      // Save to localStorage
-      this.saveCommentsToStorage();
+      // Save to storage
+      if (this.comments.storageMode === 'firestore') {
+        await this.saveCommentToFirestore(sanitizedData);
+      } else {
+        this.saveCommentsToStorage();
+      }
 
       // Update UI
       this.updateCommentsList();
@@ -286,8 +373,12 @@
       // Remove entity from viewer
       this.viewer.entities.removeById(commentId);
 
-      // Save to localStorage
-      this.saveCommentsToStorage();
+      // Delete from storage
+      if (this.comments.storageMode === 'firestore') {
+        await this.deleteCommentFromFirestore(commentId);
+      } else {
+        this.saveCommentsToStorage();
+      }
 
       // Update UI
       this.updateCommentsList();
@@ -357,15 +448,25 @@
       this.updateStatus('Deleting all comments...', 'loading');
 
       // Remove all entities from viewer
-      this.comments.comments.forEach(comment => {
+      var commentsToDelete = this.comments.comments.slice();
+      commentsToDelete.forEach(comment => {
         this.viewer.entities.removeById(comment.id);
       });
 
       // Clear comments array
       this.comments.comments = [];
 
-      // Clear localStorage
-      localStorage.removeItem(STORAGE_KEY);
+      // Clear storage
+      if (this.comments.storageMode === 'firestore' && this.comments.db) {
+        var batch = this.comments.db.batch();
+        commentsToDelete.forEach(function(comment) {
+          var ref = BimViewer.comments.db.collection(FIRESTORE_COLLECTION).doc(comment.id);
+          batch.delete(ref);
+        });
+        await batch.commit();
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
 
       // Update UI
       this.updateCommentsList();
@@ -1250,12 +1351,7 @@
   // INITIALIZATION
   // =====================================
 
-  console.log('✅ Comments module loaded (v5.0 - LOCAL STORAGE)');
-  console.log('');
-  console.log('💡 Demo Mode:');
-  console.log('   ✅ Comments stored in browser localStorage');
-  console.log('   ✅ No Firebase required');
-  console.log('   ✅ Comments persist across page reloads');
+  console.log('✅ Comments module loaded (v6.0 - DUAL STORAGE)');
   console.log('');
   console.log('⌨️  Keyboard shortcuts:');
   console.log('   - C = Toggle point comment mode');

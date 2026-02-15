@@ -19,7 +19,20 @@
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Widgets/widgets.css">
 
-  <!-- Firebase SDK removed - Demo mode uses localStorage -->
+  <!-- Edition & Feature Flags (MUST load first!) -->
+  <script src="edition.js"></script>
+
+  <!-- Firebase SDK - Pro Edition only -->
+  <script>
+    if (window.GEOBIM_EDITION === 'pro') {
+      ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']
+        .forEach(function(sdk) {
+          var s = document.createElement('script');
+          s.src = 'https://www.gstatic.com/firebasejs/10.14.1/' + sdk;
+          document.head.appendChild(s);
+        });
+    }
+  </script>
 
   <!-- Modern Styles -->
   <link rel="stylesheet" href="style.css">
@@ -45,7 +58,7 @@
     <div class="splash-content">
       <div class="splash-logo">🌍</div>
       <h1 class="splash-title">geobim.app</h1>
-      <p class="splash-subtitle">Geospatial BIM Viewer Demo</p>
+      <p class="splash-subtitle" id="splashSubtitle">Geospatial BIM Viewer Demo</p>
       <div class="splash-divider"></div>
       <p class="splash-copyright">© 2026 Christof Lorenz</p>
       <p class="splash-license">Personal & non-commercial use only.</p>
@@ -56,7 +69,25 @@
     </div>
   </div>
 
-  <!-- Login screen removed - Demo mode active -->
+  <!-- Login Screen (Pro only, hidden by default) -->
+  <div id="loginScreen" style="display: none;">
+    <div class="auth-container">
+      <h1>geobim.app</h1>
+      <p>Sign in to continue</p>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button id="loginBtn">Sign In</button>
+      <p id="loginError" style="color: red; display: none;"></p>
+    </div>
+  </div>
+
+  <script>
+    // Update splash subtitle based on edition
+    if (window.GEOBIM_EDITION === 'pro') {
+      var subtitle = document.getElementById('splashSubtitle');
+      if (subtitle) subtitle.textContent = 'Geospatial BIM Viewer Pro';
+    }
+  </script>
 
   <!-- ============================================
        MAIN APP (Hidden until logged in)
@@ -218,15 +249,15 @@
     let viewerInitialized = false;
     let splashDismissed = false;
 
-    // Splash screen handler - go directly to app (no login required)
+    // Splash screen handler
     document.getElementById('enterDemoBtn').addEventListener('click', function() {
-      // Track demo start with Plausible
+      // Track start with Plausible
       if (typeof plausible !== 'undefined') {
-        plausible('Enter Demo');
+        plausible(window.GEOBIM_EDITION === 'pro' ? 'Enter Pro' : 'Enter Demo');
       }
       document.getElementById('splashScreen').classList.add('hidden');
       splashDismissed = true;
-      // Initialize auth (demo mode - no login)
+      // Initialize auth
       if (typeof BimAuth !== 'undefined') {
         BimAuth.init();
       }
