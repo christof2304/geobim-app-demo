@@ -357,13 +357,13 @@ const BimViewer = {
       
       this.viewer = new Cesium.Viewer('cesiumContainer', {
         terrain: Cesium.Terrain.fromWorldTerrain(),
-        baseLayerPicker: true,
+        baseLayerPicker: false,
         geocoder: true,
         homeButton: true,
-        sceneModePicker: true,
-        navigationHelpButton: true,
+        sceneModePicker: false,
+        navigationHelpButton: false,
         animation: false,
-        timeline: true,
+        timeline: true,  // Keep for shadow simulation
         fullscreenButton: true,
         vrButton: false,
         infoBox: false,
@@ -643,9 +643,16 @@ const BimViewer = {
         await this.applyIFCFilter();
       }
       
-      if (typeof this.isPointCloudTileset === 'function' && typeof this.applyPointCloudSettings === 'function') {
+      // Check if this is a point cloud and mark it
+      if (typeof this.isPointCloudTileset === 'function') {
         if (this.isPointCloudTileset(tileset)) {
-          this.applyPointCloudSettings(tileset);
+          assetData.isPointCloud = true;
+          console.log(`☁️ Asset ${assetId} detected as point cloud`);
+
+          // Apply point cloud settings to preserve RGB colors
+          if (typeof this.applyPointCloudSettings === 'function') {
+            this.applyPointCloudSettings(tileset);
+          }
         }
       }
       
@@ -663,7 +670,12 @@ const BimViewer = {
       }
       
       this.updateStatus(`Asset loaded: ${assetData.name}`, 'success');
-      
+
+      // Track asset load with Plausible
+      if (typeof plausible !== 'undefined') {
+        plausible('Asset Loaded', { props: { assetName: assetData.name, assetId: assetId.toString() } });
+      }
+
       this.viewer.scene.globe.show = true;
       this.viewer.scene.skyBox.show = true;
       this.viewer.scene.skyAtmosphere.show = true;
@@ -827,10 +839,20 @@ const BimViewer = {
     if (!assetData) return;
 
     assetData.opacity = parseFloat(opacity);
-    
+
     const valueEl = document.getElementById(`opacityValue_${assetId}`);
     if (valueEl) valueEl.textContent = Math.round(opacity * 100) + '%';
-    
+
+    // For point clouds, preserve RGB colors - opacity handled differently
+    if (assetData.isPointCloud && assetData.tileset) {
+      // Keep original RGB colors for point clouds
+      // Opacity changes are not fully supported for point clouds to preserve colors
+      assetData.tileset.style = undefined;
+      console.log(`☁️ Point cloud ${assetId}: RGB colors preserved (opacity slider limited for point clouds)`);
+      return;
+    }
+
+    // For non-point-clouds, use IFC filter
     if (typeof this.applyIFCFilter === 'function') {
       this.applyIFCFilter();
     }

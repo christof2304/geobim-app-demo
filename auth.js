@@ -91,17 +91,13 @@
     showApp: function() {
       const cesiumContainer = document.getElementById('cesiumContainer');
       const toolbar = document.getElementById('toolbar');
+      const sidebarToggle = document.getElementById('sidebarToggle');
 
       if (cesiumContainer) cesiumContainer.style.display = 'block';
       if (toolbar) toolbar.style.display = 'block';
+      if (sidebarToggle) sidebarToggle.style.display = 'block';
 
-      // Initialize Comments module
-      setTimeout(() => {
-        if (typeof BimViewer !== 'undefined' && typeof BimViewer.initFirebase === 'function') {
-          console.log('Initializing Comments module...');
-          BimViewer.initFirebase();
-        }
-      }, 100);
+      // Comments module is initialized later by index.html after viewer is ready
     },
 
     // Hide App

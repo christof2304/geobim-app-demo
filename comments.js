@@ -8,17 +8,17 @@
  */
 
 // ===============================
-// CESIUM BIM VIEWER - COMMENTS MODULE (v4.4 - FIREBASE FIX)
+// CESIUM BIM VIEWER - COMMENTS MODULE (v5.0 - LOCAL STORAGE)
 // 3D Comment/Annotation System with Point & Area Support
 // NO LEFT-CLICK CONFLICT!
-// VERSION: 4.4 - FIXED: Never calls initializeApp - uses auth.js instance
+// VERSION: 5.0 - DEMO MODE: Uses localStorage instead of Firebase
 // ===============================
 'use strict';
 
 (function() {
-  
-  console.log('💬 Loading Comments module v4.4 (FIREBASE FIX)...');
-  console.log('✅ New functions available: toggleAllCommentsVisibility(), deleteAllComments()');
+
+  console.log('💬 Loading Comments module v5.0 (LOCAL STORAGE - Demo Mode)...');
+  console.log('✅ Comments stored in browser localStorage');
 
   // =====================================
   // UTILITY FUNCTIONS
@@ -105,133 +105,126 @@
   };
 
   // =====================================
-  // FIREBASE INITIALIZATION (v4.4 FIXED)
+  // LOCAL STORAGE KEY
   // =====================================
-  
+
+  const STORAGE_KEY = 'bim_viewer_comments';
+
+  // =====================================
+  // LOCAL STORAGE INITIALIZATION (v5.0 DEMO)
+  // =====================================
+
   BimViewer.initFirebase = function() {
-    // ✅ FIX: Prüfen ob bereits initialisiert
+    // Keep function name for compatibility
     if (this.comments.initialized) {
-      console.log('💬 Comments Firebase already initialized');
+      console.log('💬 Comments already initialized');
       return true;
     }
-    
-    if (typeof firebase === 'undefined') {
-      console.error('❌ Firebase SDK not loaded!');
-      this.updateStatus('Firebase SDK not loaded', 'error');
+
+    // Check if viewer is ready
+    if (!this.viewer || !this.viewer.scene) {
+      console.log('⏳ Viewer not ready yet, deferring comments initialization...');
       return false;
     }
-    
+
     try {
-      // ✅ FIX v4.4: NIEMALS initializeApp aufrufen - auth.js macht das bereits!
-      if (firebase.apps.length === 0) {
-        console.error('❌ Firebase not initialized by auth module!');
-        this.updateStatus('Please login first', 'error');
-        return false;
-      }
-      
-      console.log('✅ Using existing Firebase instance from auth module');
-      
-      // ✅ Nur Firestore initialisieren
-      this.comments.db = firebase.firestore();
+      console.log('✅ Using localStorage for comments (Demo Mode)');
+
       this.comments.initialized = true;
-      console.log('✅ Firestore ready for comments');
-      
-      // ✅ Listener starten
-      this.setupCommentsListener();
-      
-      // ✅ Click-Handler initialisieren (falls noch nicht geschehen)
+
+      // Load existing comments from localStorage
+      this.loadCommentsFromStorage();
+
+      // Initialize click handler if not already done
       if (!this.comments.clickHandlerInitialized) {
         this.initCommentClickHandler();
         this.comments.clickHandlerInitialized = true;
       }
-      
+
       return true;
-      
+
     } catch (error) {
-      console.error('❌ Firebase initialization error:', error);
-      this.updateStatus('Firebase initialization failed: ' + error.message, 'error');
+      console.error('❌ Comments initialization error:', error);
+      this.updateStatus('Comments initialization failed: ' + error.message, 'error');
       return false;
     }
   };
 
   // =====================================
-  // FIREBASE LISTENERS
+  // LOCAL STORAGE OPERATIONS
   // =====================================
-  
-  BimViewer.setupCommentsListener = function() {
-    if (!this.comments.initialized) {
-      console.warn('⚠️ Cannot setup listener - Firebase not initialized');
-      return;
-    }
-    
-    let isFirstLoad = true;
-    
-    this.comments.db.collection('bim_viewer_comments').onSnapshot((snapshot) => {
-      console.log('🔥 Comments snapshot received:', snapshot.size, 'comment(s)');
-      
-      const previousCount = this.comments.comments.length;
-      
-      this.viewer.entities.suspendEvents();
-      
+
+  BimViewer.loadCommentsFromStorage = function() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const comments = stored ? JSON.parse(stored) : [];
+
+      console.log(`📂 Loading ${comments.length} comment(s) from localStorage`);
+
+      if (this.viewer) {
+        this.viewer.entities.suspendEvents();
+      }
+
       this.comments.comments = [];
-      snapshot.forEach((doc) => {
-        const comment = { id: doc.id, ...doc.data() };
+
+      comments.forEach((comment) => {
         this.comments.comments.push(comment);
-        
-        if (!this.viewer.entities.getById(comment.id)) {
+
+        if (this.viewer && !this.viewer.entities.getById(comment.id)) {
           if (comment.type === 'area') {
             this.addAreaEntity(comment);
           } else {
             this.addCommentEntity(comment);
           }
-        } else {
-          const entity = this.viewer.entities.getById(comment.id);
-          if (entity && entity.description) {
-            entity.description = this.createCommentDescription(comment);
-          }
         }
       });
-      
-      this.viewer.entities.resumeEvents();
-      
+
+      if (this.viewer) {
+        this.viewer.entities.resumeEvents();
+      }
+
       this.updateCommentsList();
       this.updateCommentsCount();
-      
+
       console.log(`📝 Loaded ${this.comments.comments.length} comment(s)`);
-      
-      if (!isFirstLoad && this.comments.comments.length > previousCount) {
-        const newCount = this.comments.comments.length - previousCount;
-        this.updateStatus(`🔔 ${newCount} new comment(s) from other users!`, 'success');
-      }
-      
-      isFirstLoad = false;
-      
-    }, (error) => {
-      console.error('❌ Error listening to comments:', error);
-      this.updateStatus('Error loading comments', 'error');
-    });
+
+    } catch (error) {
+      console.error('❌ Error loading comments from localStorage:', error);
+      this.comments.comments = [];
+    }
+  };
+
+  BimViewer.saveCommentsToStorage = function() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.comments.comments));
+      console.log(`💾 Saved ${this.comments.comments.length} comment(s) to localStorage`);
+    } catch (error) {
+      console.error('❌ Error saving comments to localStorage:', error);
+    }
   };
 
   // =====================================
-  // COMMENT CRUD OPERATIONS
+  // COMMENT CRUD OPERATIONS (localStorage)
   // =====================================
-  
+
   BimViewer.saveComment = async function(commentData) {
     if (!this.comments.initialized) {
-      this.updateStatus('Firebase not initialized', 'error');
+      this.updateStatus('Comments not initialized', 'error');
       return false;
     }
-    
+
     try {
       const sanitizedData = {
+        id: commentData.id,
         title: sanitizeInput(commentData.title),
         text: sanitizeInput(commentData.text),
         timestamp: commentData.timestamp,
         category: commentData.category || 'General',
         priority: commentData.priority || 'Normal',
-        type: commentData.type || 'point'
+        type: commentData.type || 'point',
+        isUpdated: commentData.isUpdated || false
       };
-      
+
       if (commentData.type === 'area') {
         sanitizedData.areaPoints = commentData.areaPoints;
       } else {
@@ -239,12 +232,37 @@
         sanitizedData.lat = commentData.lat;
         sanitizedData.height = commentData.height;
       }
-      
-      await this.comments.db.collection('bim_viewer_comments')
-        .doc(commentData.id)
-        .set(sanitizedData);
-      
+
+      // Check if updating existing comment
+      const existingIndex = this.comments.comments.findIndex(c => c.id === commentData.id);
+      if (existingIndex >= 0) {
+        this.comments.comments[existingIndex] = sanitizedData;
+      } else {
+        this.comments.comments.push(sanitizedData);
+
+        // Add entity to viewer
+        if (sanitizedData.type === 'area') {
+          this.addAreaEntity(sanitizedData);
+        } else {
+          this.addCommentEntity(sanitizedData);
+        }
+      }
+
+      // Save to localStorage
+      this.saveCommentsToStorage();
+
+      // Update UI
+      this.updateCommentsList();
+      this.updateCommentsCount();
+
       console.log('✅ Comment saved:', commentData.id);
+
+      // Track comments usage with Plausible (only once per session)
+      if (typeof plausible !== 'undefined' && !this._commentsTracked) {
+        plausible('Feature Used', { props: { feature: 'Comments' } });
+        this._commentsTracked = true;
+      }
+
       return true;
     } catch (error) {
       console.error('❌ Error saving comment:', error);
@@ -255,18 +273,26 @@
 
   BimViewer.deleteComment = async function(commentId) {
     if (!this.comments.initialized) {
-      this.updateStatus('Firebase not initialized', 'error');
+      this.updateStatus('Comments not initialized', 'error');
       return false;
     }
-    
+
     if (!confirm('Delete this comment?')) return false;
-    
+
     try {
-      await this.comments.db.collection('bim_viewer_comments')
-        .doc(commentId)
-        .delete();
-      
+      // Remove from array
+      this.comments.comments = this.comments.comments.filter(c => c.id !== commentId);
+
+      // Remove entity from viewer
       this.viewer.entities.removeById(commentId);
+
+      // Save to localStorage
+      this.saveCommentsToStorage();
+
+      // Update UI
+      this.updateCommentsList();
+      this.updateCommentsCount();
+
       console.log('✅ Comment deleted:', commentId);
       this.updateStatus('Comment deleted', 'success');
       return true;
@@ -307,46 +333,48 @@
   };
 
   // =====================================
-  // DELETE ALL COMMENTS
+  // DELETE ALL COMMENTS (localStorage)
   // =====================================
-  
+
   BimViewer.deleteAllComments = async function() {
     if (!this.comments.initialized) {
-      this.updateStatus('Firebase not initialized', 'error');
+      this.updateStatus('Comments not initialized', 'error');
       return false;
     }
-    
+
     if (!this.comments.comments || this.comments.comments.length === 0) {
       this.updateStatus('No comments to delete', 'warning');
       return false;
     }
-    
+
     const count = this.comments.comments.length;
-    
-    if (!confirm(`⚠️ Delete ALL ${count} comment(s)?\n\nThis action cannot be undone!`)) {
+
+    if (!confirm(`Delete ALL ${count} comment(s)?\n\nThis action cannot be undone!`)) {
       return false;
     }
-    
+
     try {
       this.updateStatus('Deleting all comments...', 'loading');
-      
-      const batch = this.comments.db.batch();
-      
-      this.comments.comments.forEach(comment => {
-        const docRef = this.comments.db.collection('bim_viewer_comments').doc(comment.id);
-        batch.delete(docRef);
-      });
-      
-      await batch.commit();
-      
+
+      // Remove all entities from viewer
       this.comments.comments.forEach(comment => {
         this.viewer.entities.removeById(comment.id);
       });
-      
+
+      // Clear comments array
+      this.comments.comments = [];
+
+      // Clear localStorage
+      localStorage.removeItem(STORAGE_KEY);
+
+      // Update UI
+      this.updateCommentsList();
+      this.updateCommentsCount();
+
       console.log(`✅ All ${count} comments deleted`);
       this.updateStatus(`All ${count} comment(s) deleted`, 'success');
       return true;
-      
+
     } catch (error) {
       console.error('❌ Error deleting all comments:', error);
       this.updateStatus('Error deleting comments: ' + error.message, 'error');
@@ -1130,6 +1158,9 @@
     
     handler.setInputAction((click) => {
       if (!this.comments.isAddingComment) return;
+
+      // Don't process if measurement is active
+      if (this.measurement && this.measurement.active) return;
       
       try {
         const surfaceData = this.getAccurateSurfacePosition(click.position);
@@ -1218,13 +1249,13 @@
   // =====================================
   // INITIALIZATION
   // =====================================
-  
-  console.log('✅ Comments module loaded (v4.4 - FIREBASE FIX)');
+
+  console.log('✅ Comments module loaded (v5.0 - LOCAL STORAGE)');
   console.log('');
-  console.log('💡 NEW in v4.4:');
-  console.log('   ✅ FIXED: Never calls initializeApp - uses auth.js instance');
-  console.log('   ✅ Firebase is initialized AFTER successful login');
-  console.log('   ✅ No more duplicate-app errors');
+  console.log('💡 Demo Mode:');
+  console.log('   ✅ Comments stored in browser localStorage');
+  console.log('   ✅ No Firebase required');
+  console.log('   ✅ Comments persist across page reloads');
   console.log('');
   console.log('⌨️  Keyboard shortcuts:');
   console.log('   - C = Toggle point comment mode');

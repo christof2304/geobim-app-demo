@@ -26,11 +26,22 @@
   BimViewerUI.getDrawingContent = function() {
     return `
       <div class="modern-group">
+        <button id="toggleMeasurement" class="modern-btn modern-btn-accent" onclick="BimViewer.toggleMeasurementPanel()" title="Open measurement tools">
+          <span class="modern-btn-icon">📏</span>
+          <span>Measurement Tools</span>
+        </button>
+      </div>
+
+      <div class="modern-divider">
+        <span class="modern-divider-text">Clipping</span>
+      </div>
+
+      <div class="modern-group">
         <div class="modern-label">
           Clipping Polygons
           <span id="clippingPolygonCount" class="modern-badge" style="display: none;">0</span>
         </div>
-        
+
         <button id="startClippingDraw" class="modern-btn modern-btn-primary" title="Right-click to draw clipping polygon">
           <span class="modern-btn-icon">✏️</span>
           <span>Draw Polygon</span>
@@ -112,6 +123,10 @@
         BimViewer.stopClippingDraw();
       } else {
         BimViewer.startClippingDraw();
+        // Track clipping usage with Plausible
+        if (typeof plausible !== 'undefined') {
+          plausible('Feature Used', { props: { feature: 'Clipping' } });
+        }
       }
     });
     

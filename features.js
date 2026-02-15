@@ -308,6 +308,12 @@
     console.log('🎨 ============================================');
     console.log('🎨 Applying IFC Filter...');
     console.log(`🎨 Enabled entities: ${this.ifcFilter.enabledEntities.size}/${this.ifcFilter.allEntities.size}`);
+
+    // Track IFC filter usage with Plausible (only once per session)
+    if (typeof plausible !== 'undefined' && !this._ifcFilterTracked) {
+      plausible('Feature Used', { props: { feature: 'IFC Filter' } });
+      this._ifcFilterTracked = true;
+    }
     
     if (this.loadedAssets.size === 0) {
       console.warn('⚠️ No assets loaded, cannot apply IFC filter');
@@ -319,15 +325,21 @@
     
     for (const [assetId, assetData] of this.loadedAssets) {
       const tileset = assetData.tileset;
-      
+
       if (!tileset) {
         console.warn(`⚠️ Asset ${assetId}: No tileset`);
         continue;
       }
-      
+
+      // ✅ SKIP POINT CLOUDS - preserve their RGB colors
+      if (typeof this.isPointCloudTileset === 'function' && this.isPointCloudTileset(tileset)) {
+        console.log(`☁️ Asset ${assetId}: Point cloud detected - skipping IFC filter to preserve RGB colors`);
+        continue;
+      }
+
       try {
         const opacity = assetData.opacity || 1.0;
-        
+
         // ✅ Detect IFC property name if not already detected
         if (assetData.ifcPropertyName === undefined) {
           console.log(`🔍 Asset ${assetId}: Detecting IFC properties...`);
@@ -517,6 +529,12 @@
       const tileset = assetData.tileset;
       if (!tileset) continue;
 
+      // ✅ SKIP POINT CLOUDS - preserve their RGB colors
+      if (typeof this.isPointCloudTileset === 'function' && this.isPointCloudTileset(tileset)) {
+        console.log(`☁️ Asset ${assetId}: Point cloud detected - skipping Revit filter to preserve RGB colors`);
+        continue;
+      }
+
       // Detect Category property name
       const categoryPropertyName = assetData.categoryPropertyName || this.detectCategoryProperty(tileset);
 
@@ -637,11 +655,14 @@
     const handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
     
     handler.setInputAction((movement) => {
-      // Skip if in measurement mode
+      // Skip if in measurement mode or measurement panel is open
       if (this.isMeasuring && this.isMeasuring()) {
         return;
       }
-      
+      if (this.isMeasurementPanelOpen && this.isMeasurementPanelOpen()) {
+        return;
+      }
+
       // Handle drawing mode
       if (this.drawing.active) {
         const cartesian = this.viewer.scene.pickPosition(movement.position);

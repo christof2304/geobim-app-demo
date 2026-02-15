@@ -100,6 +100,27 @@
   box-shadow: 0 8px 24px rgba(90, 200, 250, 0.3);
 }
 
+.splash-cta {
+  font-size: 13px;
+  margin-top: 24px;
+  color: rgba(255,255,255,0.7);
+}
+
+.splash-cta-link {
+  color: rgba(255,255,255,0.7);
+  text-decoration: underline;
+}
+
+.splash-cta-link:hover {
+  color: rgba(255,255,255,0.9);
+}
+
+.splash-privacy {
+  font-size: 11px;
+  margin-top: 12px;
+  color: rgba(255,255,255,0.4);
+}
+
 /* ===============================
    RESET & BASE
    =============================== */
@@ -125,6 +146,36 @@ body {
 }
 
 /* ===============================
+   SIDEBAR TOGGLE BUTTON
+   =============================== */
+.sidebar-toggle {
+  position: fixed;
+  top: 10px;
+  left: 360px;
+  z-index: 101;
+  background: rgba(26, 32, 44, 0.95);
+  backdrop-filter: blur(10px);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: left 0.3s ease, background 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(46, 52, 64, 0.95);
+}
+
+#toolbar.collapsed ~ .sidebar-toggle,
+.sidebar-toggle.at-edge {
+  left: 10px;
+}
+
+/* ===============================
    MODERN TOOLBAR
    =============================== */
 #toolbar {
@@ -143,6 +194,11 @@ body {
   z-index: 100;
   font-size: 14px;
   color: #e2e8f0;
+  transition: transform 0.3s ease;
+}
+
+#toolbar.collapsed {
+  transform: translateX(-360px);
 }
 
 #toolbar::-webkit-scrollbar {
@@ -1140,7 +1196,19 @@ body {
     left: 10px;
     right: 10px;
   }
-  
+
+  #toolbar.collapsed {
+    transform: translateX(calc(-100vw + 10px));
+  }
+
+  .sidebar-toggle {
+    left: calc(100vw - 50px);
+  }
+
+  .sidebar-toggle.at-edge {
+    left: 10px;
+  }
+
   #infoBoxCustom {
     max-width: calc(100vw - 40px);
     right: 20px;

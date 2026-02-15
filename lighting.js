@@ -8,12 +8,11 @@
  */
 
 // ===============================
-// CESIUM BIM VIEWER - LIGHTING MODULE v4.1 (ENHANCED - MORE DRAMATIC)
+// CESIUM BIM VIEWER - LIGHTING MODULE v4.2 (SIMPLIFIED)
 // Terrain, Assets and Google 3D Tiles lighting support
 // Re-Enable fix, imageBasedLighting control
 // Shadows enabled for dramatic effects
-// More dramatic luminance values (0.02 - 0.8)
-// Shadow intensity control
+// Realistic mode only (ambient mode options removed)
 // ===============================
 'use strict';
 
@@ -31,7 +30,6 @@
       currentTime: null,
       animateTime: false,
       timeSpeed: 1.0,
-      ambientMode: 'realistic',
       monitoredTilesets: new WeakSet(),
       terrainReloaded: false,
       originalTerrainProvider: null
@@ -65,12 +63,18 @@
       console.error('❌ Viewer not initialized');
       return false;
     }
-    
+
     if (!this.lighting) {
       console.log('⚠️ Lighting not initialized - initializing now...');
       this.initLighting();
     }
-    
+
+    // Track lighting usage with Plausible (only when enabling)
+    if (enable && typeof plausible !== 'undefined' && !this._lightingTracked) {
+      plausible('Feature Used', { props: { feature: 'Lighting' } });
+      this._lightingTracked = true;
+    }
+
     console.log(`${enable ? '🌅 ENABLING' : '🌑 DISABLING'} Dynamic Lighting...`);
     
     if (enable) {
@@ -111,7 +115,6 @@
       }, 1000);
       
       console.log('🌅 Dynamic lighting ENABLED');
-      console.log(`   💡 Ambient mode: ${this.lighting.ambientMode}`);
       console.log(`   🌑 Shadows: ENABLED`);
       
       this.updateStatus('Dynamic lighting enabled with shadows', 'success');
@@ -367,7 +370,7 @@
           continue;
         }
         
-        this.applyLightingToTileset(primitive, this.lighting.ambientMode);
+        this.applyLightingToTileset(primitive, 'realistic');
         this.lighting.monitoredTilesets.add(primitive);
         updatedCount++;
       }
@@ -384,7 +387,7 @@
   BimViewer.updateAssetLighting = function() {
     if (!this.loadedAssets || !this.lighting) return;
     
-    const mode = this.lighting.enabled ? this.lighting.ambientMode : 'bright';
+    const mode = this.lighting.enabled ? 'realistic' : 'bright';
     let updatedCount = 0;
     
     this.loadedAssets.forEach((asset) => {
@@ -401,56 +404,6 @@
     
     if (updatedCount > 0) {
       console.log(`🔄 Updated ${updatedCount} assets (${mode} mode)`);
-    }
-  };
-  
-  // Set ambient lighting mode
-  BimViewer.setAmbientLightingMode = function(mode = 'realistic') {
-    if (!this.lighting) {
-      this.initLighting();
-    }
-    
-    console.log(`💡 Setting ambient mode to: ${mode}`);
-    this.lighting.ambientMode = mode;
-    
-    // Update all user assets
-    if (this.loadedAssets) {
-      this.loadedAssets.forEach((asset) => {
-        if (asset.tileset) {
-          this.applyLightingToTileset(asset.tileset, mode);
-        }
-      });
-    }
-    
-    // Update ALL tilesets in scene
-    const primitives = this.viewer.scene.primitives;
-    let updatedCount = 0;
-    
-    for (let i = 0; i < primitives.length; i++) {
-      const primitive = primitives.get(i);
-      
-      if (primitive instanceof Cesium.Cesium3DTileset) {
-        this.applyLightingToTileset(primitive, mode);
-        updatedCount++;
-      }
-    }
-    
-    console.log(`   Updated ${updatedCount} tilesets`);
-    this.updateStatus(`Ambient lighting: ${mode} mode`, 'success');
-    
-    // Update UI
-    this.updateAmbientModeUI(mode);
-  };
-  
-  // Update UI
-  BimViewer.updateAmbientModeUI = function(activeMode) {
-    document.querySelectorAll('.ambient-mode-btn').forEach(btn => {
-      btn.classList.remove('active');
-    });
-    
-    const activeBtn = document.querySelector(`.ambient-mode-btn[data-mode="${activeMode}"]`);
-    if (activeBtn) {
-      activeBtn.classList.add('active');
     }
   };
   
@@ -479,7 +432,6 @@
     return {
       enabled: this.lighting.enabled,
       terrainReloaded: this.lighting.terrainReloaded,
-      ambientMode: this.lighting.ambientMode,
       currentTime: this.lighting.currentTime,
       globeLighting: this.viewer.scene.globe.enableLighting,
       dynamicAtmosphere: this.viewer.scene.globe.dynamicAtmosphereLighting,
@@ -562,11 +514,10 @@
     };
   }
   
-  console.log('✅ Lighting module v4.1 loaded (ENHANCED - MORE DRAMATIC)');
+  console.log('✅ Lighting module v4.2 loaded (ENHANCED - MORE DRAMATIC)');
   console.log('');
   console.log('🚀 USAGE:');
   console.log('   BimViewer.enableDynamicLighting(true)');
-  console.log('   BimViewer.setAmbientLightingMode("realistic")');
   console.log('   BimViewer.setPresetTime("night")');
   console.log('   BimViewer.setShadowIntensity(0.6) - Adjust shadow darkness (0-1)');
   console.log('');

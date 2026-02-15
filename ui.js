@@ -47,7 +47,7 @@ const BimViewerUI = {
     // Collapsible sections
     toolbar.appendChild(this.createSection('assets', '📦', 'Assets', this.getAssetsContent()));
     toolbar.appendChild(this.createSection('pointcloud', '☁️', 'Point Cloud Settings', this.getPointCloudContent()));
-    toolbar.appendChild(this.createSection('drawing', '✏️', 'Drawing & Clipping', this.getDrawingContent()));
+    toolbar.appendChild(this.createSection('drawing', '📏', 'Measure & Clip', this.getDrawingContent()));
     toolbar.appendChild(this.createSection('comments', '💬', 'Comments', this.getCommentsContent()));
     toolbar.appendChild(this.createSection('visibility', '👁️', 'Visibility', this.getVisibilityContent()));
     toolbar.appendChild(this.createSection('ifc', '🏗️', 'IFC Filter', this.getIFCContent()));
@@ -266,6 +266,17 @@ const BimViewerUI = {
   getDrawingContent() {
     return `
       <div class="modern-group">
+        <button id="toggleMeasurement" class="modern-btn modern-btn-primary" onclick="BimViewer.toggleMeasurementPanel()" title="Open measurement tools">
+          <span class="modern-btn-icon">📏</span>
+          <span>Measurement Tools</span>
+        </button>
+      </div>
+
+      <div class="modern-divider">
+        <span class="modern-divider-text">Clipping</span>
+      </div>
+
+      <div class="modern-group">
         <button id="startDrawing" class="modern-btn modern-btn-accent" title="Right-click to draw clipping polygon">
           <span class="modern-btn-icon">✏️</span>
           <span>Start Drawing</span>
@@ -294,7 +305,7 @@ const BimViewerUI = {
           <span>Buildings Only</span>
         </button>
       </div>
-      
+
       <div class="modern-hint">
         <strong>Usage:</strong> Click map to add points • ESC to exit
       </div>
@@ -429,24 +440,6 @@ const BimViewerUI = {
 
       <div id="lightingControlsContainer" style="display: none;">
         <div class="modern-group">
-          <div class="modern-label">Ambient Mode</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-            <button class="modern-btn modern-btn-small ambient-mode-btn active" data-mode="realistic" title="Dark at night">
-              <span>🌙</span> Realistic
-            </button>
-            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="soft" title="Slightly lit at night">
-              <span>🌆</span> Soft
-            </button>
-            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="balanced" title="Well lit at night">
-              <span>🌃</span> Balanced
-            </button>
-            <button class="modern-btn modern-btn-small ambient-mode-btn" data-mode="bright" title="Always bright">
-              <span>💡</span> Bright
-            </button>
-          </div>
-        </div>
-
-        <div class="modern-group">
           <div class="modern-label">Time of Day</div>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px;">
             <button class="modern-btn modern-btn-small time-preset-btn" data-time="dawn" title="06:00">🌄</button>
@@ -457,23 +450,6 @@ const BimViewerUI = {
             <button class="modern-btn modern-btn-small time-preset-btn" data-time="dusk" title="20:00">🌆</button>
             <button class="modern-btn modern-btn-small time-preset-btn" data-time="night" title="22:00">🌙</button>
             <button class="modern-btn modern-btn-small time-preset-btn" data-time="midnight" title="00:00">🌃</button>
-          </div>
-        </div>
-
-        <div class="modern-group">
-          <div class="modern-label">Animation</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-            <button id="playLightingAnim" class="modern-btn modern-btn-small">
-              <span>▶️</span> Play
-            </button>
-            <button id="stopLightingAnim" class="modern-btn modern-btn-small">
-              <span>⏹️</span> Stop
-            </button>
-          </div>
-          <div class="modern-slider-group" style="margin-top: 8px;">
-            <label class="modern-label-small">Speed</label>
-            <input type="range" id="lightingSpeedSlider" min="1" max="100" value="10" class="modern-slider-small">
-            <span id="lightingSpeedValue" class="modern-value-small">10x</span>
           </div>
         </div>
 
@@ -643,6 +619,30 @@ const BimViewerUI = {
 
   // ✅ COMPLETE: Initialize all event handlers
   initEventHandlers() {
+    // Sidebar toggle functionality
+    const toggleSidebar = () => {
+      const toolbar = document.getElementById('toolbar');
+      const toggle = document.getElementById('sidebarToggle');
+      if (!toolbar || !toggle) return;
+
+      toolbar.classList.toggle('collapsed');
+      const isCollapsed = toolbar.classList.contains('collapsed');
+      toggle.textContent = isCollapsed ? '☰' : '✕';
+      toggle.classList.toggle('at-edge', isCollapsed);
+    };
+
+    document.getElementById('sidebarToggle')?.addEventListener('click', toggleSidebar);
+
+    // Keyboard shortcut: M to toggle sidebar
+    document.addEventListener('keydown', function(e) {
+      if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.altKey) {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      }
+    });
+
     // Ion Assets Loading (manual reload - hidden by default)
     document.getElementById('loadIonAssets')?.addEventListener('click', async () => {
       const btn = document.getElementById('loadIonAssets');
@@ -784,28 +784,16 @@ const BimViewerUI = {
 
       const isEnabled = BimViewer.lighting?.enabled;
       if (isEnabled) {
-        BimViewer.disableDynamicLighting();
+        BimViewer.enableDynamicLighting(false); // Disable lighting
         this.classList.remove('active');
         this.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Enable Lighting</span>';
         document.getElementById('lightingControlsContainer').style.display = 'none';
       } else {
-        BimViewer.enableDynamicLighting();
+        BimViewer.enableDynamicLighting(true); // Enable lighting
         this.classList.add('active');
         this.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Lighting ON</span>';
         document.getElementById('lightingControlsContainer').style.display = 'block';
       }
-    });
-
-    // Ambient mode buttons
-    document.querySelectorAll('.ambient-mode-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('.ambient-mode-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        const mode = this.dataset.mode;
-        if (typeof BimViewer.setAmbientMode === 'function') {
-          BimViewer.setAmbientMode(mode);
-        }
-      });
     });
 
     // Time preset buttons
@@ -814,33 +802,10 @@ const BimViewerUI = {
         document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         const time = this.dataset.time;
-        if (typeof BimViewer.setTimePreset === 'function') {
-          BimViewer.setTimePreset(time);
+        if (typeof BimViewer.setPresetTime === 'function') {
+          BimViewer.setPresetTime(time);
         }
       });
-    });
-
-    // Animation controls
-    document.getElementById('playLightingAnim')?.addEventListener('click', () => {
-      if (typeof BimViewer.startTimeAnimation === 'function') {
-        BimViewer.startTimeAnimation();
-        BimViewer.updateStatus('Time animation started', 'success');
-      }
-    });
-
-    document.getElementById('stopLightingAnim')?.addEventListener('click', () => {
-      if (typeof BimViewer.stopTimeAnimation === 'function') {
-        BimViewer.stopTimeAnimation();
-        BimViewer.updateStatus('Time animation stopped', 'success');
-      }
-    });
-
-    document.getElementById('lightingSpeedSlider')?.addEventListener('input', function() {
-      const speed = parseInt(this.value);
-      document.getElementById('lightingSpeedValue').textContent = speed + 'x';
-      if (typeof BimViewer.setAnimationSpeed === 'function') {
-        BimViewer.setAnimationSpeed(speed);
-      }
     });
 
     // Shadows toggle
@@ -873,6 +838,11 @@ const BimViewerUI = {
     document.getElementById('toggleGoogle3DTiles')?.addEventListener('click', (e) => {
       BimViewer.toggleGoogle3DTiles();
       e.target.classList.toggle('active');
+
+      // Track Google 3D Tiles usage with Plausible
+      if (typeof plausible !== 'undefined' && e.target.classList.contains('active')) {
+        plausible('Feature Used', { props: { feature: 'Google 3D Tiles' } });
+      }
     });
 
     document.getElementById('toggleGlobeTransparency')?.addEventListener('click', (e) => {

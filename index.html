@@ -8,14 +8,18 @@
   <!-- Favicon Fix -->
   <link rel="icon" href="data:,">
 
+  <!-- Privacy-friendly analytics by Plausible -->
+  <script async src="https://plausible.io/js/pa-l_LicZpu1DpGT201Nqezw.js"></script>
+  <script>
+    window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+    plausible.init()
+  </script>
+
   <!-- Cesium Library -->
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Widgets/widgets.css">
 
-  <!-- Firebase SDK (with Auth!) -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDK removed - Demo mode uses localStorage -->
 
   <!-- Modern Styles -->
   <link rel="stylesheet" href="style.css">
@@ -47,6 +51,8 @@
       <p class="splash-license">Personal & non-commercial use only.</p>
       <p class="splash-contact">Contact: info@geobim.app</p>
       <button id="enterDemoBtn" class="splash-button">Enter Demo</button>
+      <p class="splash-cta">Want to use your own IFC/Revit models? <a href="mailto:info@geobim.app" class="splash-cta-link" onclick="if(typeof plausible!=='undefined')plausible('Contact Click')">Contact me</a></p>
+      <p class="splash-privacy">🔒 Privacy-friendly analytics (no cookies)</p>
     </div>
   </div>
 
@@ -59,8 +65,11 @@
   <!-- Main Cesium Container -->
   <div id="cesiumContainer" style="display: none;"></div>
 
+  <!-- Sidebar Toggle Button -->
+  <button id="sidebarToggle" class="sidebar-toggle at-edge" style="display: none;" title="Toggle sidebar (M)">☰</button>
+
   <!-- Modern Toolbar -->
-  <div id="toolbar" style="display: none;"></div>
+  <div id="toolbar" class="collapsed" style="display: none;"></div>
 
   <!-- Custom Info Box -->
   <div id="infoBoxCustom"></div>
@@ -214,6 +223,10 @@
 
     // Splash screen handler - go directly to app (no login required)
     document.getElementById('enterDemoBtn').addEventListener('click', function() {
+      // Track demo start with Plausible
+      if (typeof plausible !== 'undefined') {
+        plausible('Enter Demo');
+      }
       document.getElementById('splashScreen').classList.add('hidden');
       splashDismissed = true;
       // Initialize auth (demo mode - no login)
@@ -337,21 +350,19 @@
       }, 5000);
     }
 
-    // Initialize Firebase, Comments, Hide Features, etc.
+    // Initialize Comments (localStorage), Hide Features, etc.
     function initializeRemainingSystems() {
       console.log('');
       console.log('INITIALIZING REMAINING SYSTEMS:');
 
-      // Initialize Firebase (comments)
+      // Initialize Comments (localStorage - Demo Mode)
       if (typeof BimViewer.initFirebase === 'function') {
         if (BimViewer.initFirebase()) {
-          console.log('Firebase Firestore initialized for comments');
+          console.log('Comments initialized (localStorage - Demo Mode)');
           const statusEl = document.getElementById('commentsListStatus');
           if (statusEl) statusEl.textContent = 'Ready';
         } else {
-          console.log('Firebase Firestore initialization failed');
-          const initBtn = document.getElementById('initFirebaseBtn');
-          if (initBtn) initBtn.style.display = 'block';
+          console.log('Comments initialization failed');
           const statusEl = document.getElementById('commentsListStatus');
           if (statusEl) statusEl.textContent = 'Not initialized';
         }
@@ -377,8 +388,7 @@
 
       console.log('');
       console.log('All systems ready!');
-      console.log('LOGGED IN AS:', BimAuth.getCurrentUser()?.email);
-      console.log('ION TOKEN:', BimAuth.getIonToken()?.substring(0, 20) + '...');
+      console.log('Demo Mode active - user:', BimAuth.getCurrentUser()?.email);
       console.log('');
     }
   </script>

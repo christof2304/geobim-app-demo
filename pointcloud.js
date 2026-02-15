@@ -75,10 +75,19 @@
   // Check if a tileset is a point cloud
   BimViewer.isPointCloudTileset = function(tileset) {
     if (!tileset) return false;
-    
-    // Check if tileset has point cloud style properties
+
+    // Check if tileset has point cloud shading (most reliable indicator)
     if (tileset.pointCloudShading) return true;
-    
+
+    // Check if already marked as point cloud in asset data
+    if (this.loadedAssets) {
+      for (const [assetId, assetData] of this.loadedAssets) {
+        if (assetData.tileset === tileset && assetData.isPointCloud) {
+          return true;
+        }
+      }
+    }
+
     // Check root tile content type
     if (tileset.root && tileset.root.content) {
       const contentUri = tileset.root.content.uri || '';
@@ -86,8 +95,34 @@
         return true;
       }
     }
-    
+
+    // Check tileset extras or asset metadata
+    try {
+      if (tileset.asset && tileset.asset.extras) {
+        const extras = tileset.asset.extras;
+        if (extras.ion && extras.ion.assetType === 'POINTCLOUD') {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
     return false;
+  };
+
+  // Mark a tileset as point cloud in asset data
+  BimViewer.markAsPointCloud = function(assetId) {
+    const assetData = this.loadedAssets?.get(assetId.toString());
+    if (assetData) {
+      assetData.isPointCloud = true;
+      console.log(`☁️ Asset ${assetId} marked as point cloud`);
+
+      // Apply point cloud settings immediately
+      if (assetData.tileset && typeof this.applyPointCloudSettings === 'function') {
+        this.applyPointCloudSettings(assetData.tileset);
+      }
+    }
   };
 
   // Apply point cloud settings to a specific tileset
@@ -245,6 +280,12 @@
     this.applyPointCloudSettingsToAllTilesets();
     this.updateStatus(`EDL ${enabled ? 'enabled' : 'disabled'}`, 'success');
     console.log(`☁️ Eye Dome Lighting: ${enabled}`);
+
+    // Track point cloud usage with Plausible (only once per session)
+    if (typeof plausible !== 'undefined' && !this._pointCloudTracked) {
+      plausible('Feature Used', { props: { feature: 'Point Cloud' } });
+      this._pointCloudTracked = true;
+    }
   };
 
   // Update EDL Strength
